@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flipper Lab</title>
+<link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="dot" id="statusDot"></span> Flipper Lab</div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="remote">Screen</button>
+    <button data-tab="learn">Learn</button>
+    <button data-tab="files">Files</button>
+    <button data-tab="console">Console</button>
+  </nav>
+  <button id="connectBtn" class="primary">Connect</button>
+</header>
+
+<main>
+  <div id="errorBanner" class="banner warn" hidden></div>
+  <script>
+    // Surface script errors on the page instead of failing silently.
+    window.addEventListener("error", (e) => {
+      const b = document.getElementById("errorBanner");
+      b.hidden = false;
+      b.textContent = `Something broke: ${e.message} (${(e.filename || "").split("/").pop()}:${e.lineno}). Try reloading with Ctrl+Shift+R.`;
+    });
+  </script>
+  <div id="unsupported" class="banner warn" hidden>
+    This browser has no Web Serial support. Open this page in Chromium, Chrome or Edge on a desktop computer.
+  </div>
+  <div id="busyBanner" class="banner" hidden>
+    <span id="busyText">Running…</span>
+    <button id="stopBtn" class="danger small">Stop (Ctrl+C)</button>
+  </div>
+
+  <!-- Dashboard -->
+  <section id="tab-dashboard" class="tab active">
+    <div class="grid">
+      <div class="card">
+        <h2>Device</h2>
+        <dl id="devInfo" class="kv"><dt>Status</dt><dd>Not connected</dd></dl>
+      </div>
+      <div class="card">
+        <h2>Battery</h2>
+        <div class="meter"><div id="battBar"></div></div>
+        <dl id="battInfo" class="kv"></dl>
+      </div>
+      <div class="card">
+        <h2>SD card</h2>
+        <div class="meter"><div id="sdBar"></div></div>
+        <dl id="sdInfo" class="kv"></dl>
+      </div>
+      <div class="card">
+        <h2>Lights &amp; buzz</h2>
+        <p class="muted">Controls the RGB status LED and vibration motor. A safe first experiment.</p>
+        <div class="row">
+          <input type="color" id="ledColor" value="#ff8200">
+          <button id="ledSet">Set LED</button>
+          <button id="ledOff">LED off</button>
+        </div>
+        <div class="row">
+          <button id="vibroBtn">Buzz 0.3 s</button>
+          <button id="refreshBtn">Refresh info</button>
+        </div>
+      </div>
+    </div>
+    <p class="muted small">Every button runs a normal Flipper CLI command. Open the Console tab to see each command and the Flipper's reply.</p>
+  </section>
+
+  <!-- Remote -->
+  <section id="tab-remote" class="tab">
+    <div class="card remote-card">
+      <h2>Screen &amp; remote</h2>
+      <canvas id="screen" class="lcd" width="128" height="64"></canvas>
+      <div class="row">
+        <button class="mirror-toggle primary">Start screen mirror</button>
+        <button id="shotBtn" disabled>Save screenshot</button>
+      </div>
+      <p class="muted small">Mirroring switches the USB link into the Flipper's RPC mode (the same protocol qFlipper uses), so other tabs' commands wait until you stop it.
+      Without mirroring, the buttons use <code>input send &lt;key&gt; short</code>. Keyboard: arrow keys, Enter = OK, Backspace = Back. Hold Shift for a long press.</p>
+      <div class="dpad">
+        <button data-key="up" class="k-up">▲</button>
+        <button data-key="left" class="k-left">◀</button>
+        <button data-key="ok" class="k-ok">OK</button>
+        <button data-key="right" class="k-right">▶</button>
+        <button data-key="down" class="k-down">▼</button>
+        <button data-key="back" class="k-back">↩ Back</button>
+      </div>
+      <label class="row"><input type="checkbox" id="longPress"> Long press</label>
+    </div>
+  </section>
+
+  <!-- Learn -->
+  <section id="tab-learn" class="tab">
+    <div class="card xp-card" id="xpCard"></div>
+    <div class="learn-layout">
+      <aside class="lesson-list" id="lessonList"></aside>
+      <article class="card lesson" id="lessonView"></article>
+      <aside class="card screen-side">
+        <canvas class="lcd" width="128" height="64"></canvas>
+        <button class="mirror-toggle primary">Start screen mirror</button>
+        <div class="dpad mini">
+          <button data-key="up" class="k-up">▲</button>
+          <button data-key="left" class="k-left">◀</button>
+          <button data-key="ok" class="k-ok">OK</button>
+          <button data-key="right" class="k-right">▶</button>
+          <button data-key="down" class="k-down">▼</button>
+          <button data-key="back" class="k-back">↩</button>
+        </div>
+        <p class="muted small">Follow along on the live screen. With the mirror on, arrow keys, Enter and Backspace control the Flipper.</p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Files -->
+  <section id="tab-files" class="tab">
+    <div class="card">
+      <div class="row">
+        <button id="upBtn">⬆ Up</button>
+        <code id="cwd">/ext</code>
+        <button id="lsBtn">Reload</button>
+      </div>
+      <ul id="fileList" class="files"></ul>
+    </div>
+    <div class="card" id="fileViewCard" hidden>
+      <h2 id="fileViewName"></h2>
+      <pre id="fileView" class="out"></pre>
+      <div id="fileExplain"></div>
+    </div>
+  </section>
+
+  <!-- Console -->
+  <section id="tab-console" class="tab">
+    <div class="card">
+      <pre id="term" class="term"></pre>
+      <form id="termForm" class="row">
+        <span class="prompt">&gt;:</span>
+        <input id="termInput" autocomplete="off" spellcheck="false" placeholder="Type a command, e.g. help">
+        <button>Send</button>
+        <button type="button" id="ctrlC" class="danger">Ctrl+C</button>
+        <button type="button" id="clearTerm">Clear</button>
+      </form>
+      <p class="muted small">Commands that keep running (such as <code>log</code> or the "read" commands) stop when you press Ctrl+C.</p>
+    </div>
+  </section>
+</main>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="lessons.js?v=3"></script>
+<script src="explain.js?v=3"></script>
+<script src="app.js?v=3"></script>
+<script src="learn.js?v=3"></script>
+</body>
+</html>
